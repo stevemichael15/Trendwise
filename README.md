@@ -87,8 +87,10 @@ Author:
 - 💼 LinkedIn: [Steve Michael](https://www.linkedin.com/in/steve-michael-512666222)  
 - 🖥️ GitHub: [stevemichael15](https://github.com/stevemichael15)  
 - 📊 Kaggle: [steve92510](https://www.kaggle.com/steve92510)
-Contributing:
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+🤝 Contributing
+Pull requests are welcome!
+For major changes, open an issue first to discuss what you want to improve or fix.
 
 Feedback:
 If you find bugs or have feature requests, open an issue or email me directly.
+
