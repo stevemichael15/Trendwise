@@ -83,10 +83,10 @@ subject to the following conditions:
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
 
 Author:
-Steve Prince Michael  
-GitHub: https://github.com/steveprince  
-Email: stevemichael681@gmail.com
-
+- 📧 Email: [stevemichael681@gmail.com](mailto:stevemichael681@gmail.com)  
+- 💼 LinkedIn: [Steve Michael](https://www.linkedin.com/in/steve-michael-512666222)  
+- 🖥️ GitHub: [stevemichael15](https://github.com/stevemichael15)  
+- 📊 Kaggle: [steve92510](https://www.kaggle.com/steve92510)
 Contributing:
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
