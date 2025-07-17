@@ -1,4 +1,15 @@
 __pycache__/
-*.pyc 
-media/ 
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
 venv/
+*.egg-info/
+instance/
+*.DS_Store
+.env*
+.vscode/
+*.zip
+*.tar.gz
