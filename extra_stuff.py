@@ -97,3 +97,5 @@ def show_close_plot(df, stock, start_date, end_date):
     plt.savefig(os.path.join("static", filename), dpi=300, bbox_inches="tight")
     plt.close()
     return filename
+
+

@@ -9,3 +9,7 @@ def test_signup():
   }
   response = tester.get("/home", json = data)
   assert response.status_code == 405
+
+def test_login():
+  tester = app.test_client()
+  data = {

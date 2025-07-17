@@ -1,10 +1,12 @@
+import sqlite3
+from werkzeug.security import generate_password_hash, check_password_hash
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from flask import Flask, render_template, request, session, jsonify
+from flask import Flask, render_template, request, session, jsonify, redirect, url_for
 import yfinance as yf
 import os
 from functools import wraps
@@ -48,25 +50,63 @@ def home():
     """
     return render_template("index.html")
 
-@app.route('/login', methods=['GET', 'POST'])
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    error = None
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        # Hardcoded credentials for demo
-        if username == 'admin' and password == 'password123':
-            session['authenticated'] = True
-            return render_template('index.html')
+    if request.method == "POST":
+        username = request.form.get("Username")
+        password = request.form.get("Password")
+
+        conn = sqlite3.connect("trendwise.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result and check_password_hash(result[0], password):
+            session["username"] = username
+            session["authenticated"] = True
+            return redirect("/home-page")
         else:
-            error = 'Invalid username or password.'
-    return render_template('login.html', error=error)
+            return render_template("login.html", error="Invalid username or password")
+    
+    # For GET (i.e., just visiting /login)
+    return render_template("login.html")
+
+
+
+
+
+
+
+@app.route('/dashboard')
+def dashboard():
+    if not session.get('authenticated'):
+        return redirect('/login')
+    
+    username = session.get('username', 'User')
+
+    dates = ["2025-07-01", "2025-07-02", "2025-07-03"]
+    prices = [100, 110, 120]
+
+    return render_template("dashboard.html", username=username, dates=dates, prices=prices)
+
+
+@app.route('/logout')
+def logout():
+    session.pop('authenticated', None)
+    image_folder = os.path.join(app.root_path, 'static')
+    for file in os.listdir(image_folder):
+        if file.endswith('.png'):
+            os.remove(os.path.join(image_folder, file))
+    return redirect(url_for('login'))
+
+
 
 api = Api(app, version="1.0", title="Stock Analysis API", description="A simple Stock Analysis API", doc="/docs")
 
 index_np = api.namespace("Index", description="Index operations", path="/index")
 analysis_np = api.namespace("Analysis", description="Analysis operations", path="/analysis")
-home_np = api.namespace("Home", description="Home operations", path="/home")
 login_np = api.namespace("Login", description="Login operations", path="/login")
 
 input_model = api.model("InputModel", {
@@ -75,17 +115,12 @@ input_model = api.model("InputModel", {
     "endDate": fields.String(required=True, description="End date in YYYY-MM-DD format")
 })
 
-# @login_np.route("/")
-# @login_required
-# def home():
-#     """
-#     This function renders the home page of the application.
-# 
-#     Returns:
-#         render_template: The rendered HTML template for the home page.
-#     """
-#     return render_template("index.html")
+# home_np = api.namespace("Home", description="Home operations", path="/home-api")
 
+# @home_np.route("/", methods=["POST"])
+# class HomeResource(Resource):
+#     def post(self):
+#         return {"message": "Welcome to the Stock Analysis API!"}
 
 
 @index_np.route("/")
@@ -121,8 +156,9 @@ class AnalysisResource(Resource):
     startDate = api.payload.get("startDate")
     endDate = api.payload.get("endDate")
     df = yf.download(stockname, start= f"{startDate}", end= f"{endDate}")
-    high = round(df["High"].max()[0], 2)
-    low = round(df["Low"].min()[0], 2)
+    high = round(df["High"].max(), 2)
+    low = round(df["Low"].min(), 2)
+
     show_close_plot(df)
     show_combine_plot(df)
     show_high_plot(df)
@@ -148,27 +184,12 @@ class AnalysisResource(Resource):
     return render_template("analysis.html", stockname=stockname, startDate=startDate, endDate=endDate, high=high, low=low, og_name=og_name, sector=sector, industry=industry, ceo=ceo, headquarters=headquarters, market_cap=market_cap, pe_ratio_forward=pe_ratio_forward, pe_ratio_trailing=pe_ratio_trailing, eps=eps, dividend_yield=dividend_yield, fifty_two_week_high=fifty_two_week_high, fifty_two_week_low=fifty_two_week_low)
 
 
-@home_np.route("/", methods=["POST"])
-class HomeResource(Resource):
-    def post(self):
-        """API Home Endpoint.
-        **Returns**
-        a message indicating that the API is running and ready for use."""        
-        return {"message": "Welcome to the Stock Analysis API!"}
 
-@app.route("/home", methods=["POST"])
-def signup():
-  username = request.form.get("Username")
-  session["username"] = username
-  return render_template("home.html", username = username)  
-nnew = "hello"
-@app.route("/intro")
-def intro():
-  return render_template("intro.html", nnew= nnew)
+@app.route("/home", methods=["GET", "POST"])
+def home_page():
+    return render_template("home.html", username=session["username"])
 
-@app.route("/hello")
-def hello():
-    return "Hello, World!"
+
 
 
 @app.route("/mistake")
@@ -246,34 +267,86 @@ def delete_images():
                     os.remove(img_path)
                     deleted.append(img)
                 except Exception as e:
-                    pass  # Optionally log error
+                    pass 
     return jsonify({'deleted': deleted})
 
+@app.route('/predict/<ticker>')
+def predict_stock(ticker):
+    import io
+    import base64
+    from pmdarima import auto_arima
+    from statsmodels.tsa.stattools import adfuller
+    import matplotlib.pyplot as plt
+    import matplotlib
+    matplotlib.use('Agg')
 
+    def test_stationality(timeseries):
+        rolling_mean = timeseries.rolling(48).mean()
+        rolling_std = timeseries.rolling(48).std()
 
+        # Plot rolling stats (optional if you want to save/display it separately)
+        plt.style.use("ggplot")
+        plt.figure(figsize=(18, 8))
+        plt.grid(True)
+        plt.xlabel("Dates", fontsize=20)
+        plt.xticks(fontsize=15)
+        plt.ylabel("Close Price", fontsize=20)
+        plt.yticks(fontsize=15)
+        plt.plot(timeseries, linewidth=2, color="blue", label="Original")
+        plt.plot(rolling_mean, linewidth=2, color="red", label="Rolling Mean")
+        plt.plot(rolling_std, linewidth=2, color="green", label="Rolling Std")
+        plt.title(f"{ticker} Stock Rolling Statistics", fontsize=30)
+        plt.legend()
+        plt.tight_layout()
+        plt.close()  # Just for calculation; don't display here
 
+        # ADF Test
+        adft = adfuller(timeseries["Close"])
+        p_value = adft[1]
+        return "Stationary" if p_value < 0.05 else "Non-Stationary"
 
+    # Step 1: Download stock data
+    df = yf.download(ticker, period="1y")
+    df = df[['Close']].dropna()
+    df = df.round(2)
+    df.reset_index(inplace=True)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df.set_index("Date", inplace=True)
 
+    # Step 2: Test stationarity and define `d`
+    stationarity = test_stationality(df)
+    d = 0 if stationarity == "Stationary" else 1
 
+    # Step 3: Fit ARIMA
+    model = auto_arima(df['Close'], start_p=0, start_q=0, max_p=5, max_q=5, d=d,
+                       seasonal=False, stepwise=True, trace=False)
+    
+    # Step 4: Forecast next day
+    forecast = model.predict(n_periods=1)[0]
 
+    # Step 5: Plot last 60 days + forecast
+    recent = df['Close'][-60:]
+    forecast_date = recent.index[-1] + pd.Timedelta(days=1)
+    forecast_series = recent.append(pd.Series([forecast], index=[forecast_date]))
 
+    plt.figure(figsize=(10, 5))
+    plt.plot(recent.index, recent.values, label='Recent Close', color='blue')
+    plt.plot(forecast_series.index[-2:], forecast_series.values[-2:], label='Forecast', color='red', marker='o')
+    plt.title(f'{ticker} Stock Price Prediction (Next Day)', fontsize=16)
+    plt.xlabel('Date')
+    plt.ylabel('Close Price (USD)')
+    plt.legend()
+    plt.grid(True)
 
+    # Convert plot to base64 image
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close()
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.getvalue()).decode('ascii')
 
+    return render_template('predict.html', ticker=ticker, forecast=round(forecast, 2), plot_url=img_base64)
 
-
-
-
-
-
-# @app.route("/about", methods=["POST"])
-# def sign_up():
-#   if not email or not password:
-#         return "Missing email or password", 400 
-#   return f"Your email is: {email}\n Your Password is: {password}"
-
-
-# email = request.form.get("Email")
-# password = request.form.get("Password")
 
 
 
